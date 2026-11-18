@@ -213,6 +213,14 @@ namespace SKILL_ISSUE.Entities
         }
 
         /// <summary>
+        /// Stop vertical movement (e.g., after teleport).
+        /// </summary>
+        public void StopVertical()
+        {
+            Velocity = new Vector2(Velocity.X, 0);
+        }
+
+        /// <summary>
         /// Reset player to spawn position with zero velocity.
         /// </summary>
         public void Respawn(Vector2 spawnPosition)

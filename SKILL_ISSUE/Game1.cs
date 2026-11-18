@@ -7,7 +7,10 @@ using SKILL_ISSUE.Input;
 using SKILL_ISSUE.Entities;
 using SKILL_ISSUE.Physics;
 using SKILL_ISSUE.Traps;
+using SKILL_ISSUE.Level;
+using SKILL_ISSUE.UI;
 using System.Collections.Generic;
+using System.IO;
 
 namespace SKILL_ISSUE
 {
@@ -23,17 +26,27 @@ namespace SKILL_ISSUE
         private Player _player;
         private CollisionWorld _collisionWorld;
         private List<TrapBase> _traps;
+        private WorldProgressionManager _progression;
+
+        // Current level
+        private LevelData _currentLevel;
+        private Vector2 _spawnPosition;
+        private Rectangle _exitBounds;
 
         // Game state
+        private GameState _gameState;
         private int _deathCount;
         private float _respawnAlpha;
 
+        // UI
+        private MainMenu _mainMenu;
+        private LevelSelectMenu _levelSelectMenu;
+        private PauseMenu _pauseMenu;
+        private LevelCompleteScreen _levelCompleteScreen;
+
         // Temporary placeholder visuals
         private Texture2D _placeholderPixel;
-        private SpriteFont _debugFont; // Will be null until we add a font
-
-        // Spawn point - on left floor, closer to left platform
-        private readonly Vector2 _spawnPosition = new Vector2(100, 430);
+        private SpriteFont _debugFont;
 
         public Game1()
         {
@@ -64,113 +77,62 @@ namespace SKILL_ISSUE
             );
 
             _inputManager = new InputManager();
-            _player = new Player(_spawnPosition);
             _collisionWorld = new CollisionWorld();
             _traps = new List<TrapBase>();
+            _progression = new WorldProgressionManager();
             _deathCount = 0;
             _respawnAlpha = 1f;
 
-            // Build test level geometry
-            BuildTestLevel();
+            // Initialize UI
+            _mainMenu = new MainMenu();
+            _pauseMenu = new PauseMenu();
+            _levelCompleteScreen = new LevelCompleteScreen();
+            _gameState = GameState.MainMenu;
+
+            // Level select will be initialized after progression manager
+            _levelSelectMenu = new LevelSelectMenu(_progression);
 
             base.Initialize();
         }
 
-        private void BuildTestLevel()
+        private void StartGame()
         {
+            LoadLevel("W1_L1");
+            _player = new Player(_spawnPosition);
+            _gameState = GameState.Playing;
+        }
+
+        private void LoadLevel(string levelId)
+        {
+            string levelPath = Path.Combine(Content.RootDirectory, "Levels", $"{levelId}.json");
+
+            if (!File.Exists(levelPath))
+            {
+                throw new FileNotFoundException($"Level file not found: {levelPath}");
+            }
+
+            string jsonContent = File.ReadAllText(levelPath);
+            _currentLevel = LevelLoader.LoadFromJson(jsonContent);
+
+            _spawnPosition = _currentLevel.SpawnPosition;
+            _exitBounds = _currentLevel.ExitBounds;
+
             _collisionWorld.Clear();
             _traps.Clear();
 
-            // Main floor - NOT full width, has GAP in middle for death testing
-            _collisionWorld.AddSolidPlatform(new Rectangle(0, 460, 300, 80));     // Left floor
-            _collisionWorld.AddSolidPlatform(new Rectangle(500, 460, 460, 80));   // Right floor
-            // GAP at X=300-500 for easy death testing
+            foreach (var platform in _currentLevel.Platforms)
+            {
+                _collisionWorld.AddSolidPlatform(new Rectangle(platform.X, platform.Y, platform.Width, platform.Height));
+            }
 
-            // Left wall
-            _collisionWorld.AddSolidPlatform(new Rectangle(0, 0, 40, 540));
+            foreach (var hazard in _currentLevel.Hazards)
+            {
+                _collisionWorld.AddHazard(new Rectangle(hazard.X, hazard.Y, hazard.Width, hazard.Height));
+            }
 
-            // Right wall
-            _collisionWorld.AddSolidPlatform(new Rectangle(920, 0, 40, 540));
+            _traps = LevelLoader.CreateTrapsFromData(_currentLevel.Traps);
 
-            // Platform layout - ALL gaps respect MaxJumpHeight = 95px (jump increased to -550)
-            // Spawn is at Y=430 (standing on floor at Y=460)
-
-            // Left low platform - 55px above spawn - VERY EASY to reach now
-            _collisionWorld.AddSolidPlatform(new Rectangle(140, 375, 120, 20));
-
-            // Center platform - 85px above left platform (within 95px limit)
-            _collisionWorld.AddSolidPlatform(new Rectangle(320, 290, 200, 20));
-
-            // Right low platform - same height as left for symmetry
-            _collisionWorld.AddSolidPlatform(new Rectangle(600, 375, 120, 20));
-
-            // High platform - 80px above center (within 95px limit)
-            _collisionWorld.AddSolidPlatform(new Rectangle(380, 210, 140, 20));
-
-            // Hazard zone - covers GAP and bottom area
-            _collisionWorld.AddHazard(new Rectangle(0, 480, 960, 100));
-
-            // === TRAP DEMONSTRATIONS ===
-
-            // 1. Hidden Spikes - on right floor section
-            _traps.Add(new HiddenSpikes(
-                triggerBounds: new Rectangle(700, 400, 100, 60),
-                spikeBasePosition: new Rectangle(700, 460, 100, 10)
-            ));
-
-            // 2. Fake Platform - center platform replacement (make one section fake)
-            _traps.Add(new FakePlatform(
-                platformRect: new Rectangle(420, 290, 80, 20)
-            ));
-
-            // 3. Disappearing Floor - left floor section near spawn
-            _traps.Add(new DisappearingFloor(
-                triggerZone: new Rectangle(200, 300, 60, 100),
-                floorRect: new Rectangle(200, 460, 80, 20)
-            ));
-
-            // 4. Falling Block - above high platform
-            _traps.Add(new FallingBlock(
-                triggerZone: new Rectangle(380, 210, 140, 20),
-                blockStartPosition: new Vector2(400, 100),
-                width: 40,
-                height: 40
-            ));
-
-            // === NEW TRAPS (Milestone 6) ===
-
-            // 5. Moving Platform - traverses the gap
-            _traps.Add(new MovingPlatform(
-                startPoint: new Vector2(300, 420),
-                endPoint: new Vector2(450, 420),
-                width: 80,
-                height: 15
-            ));
-
-            // 6. Rotating Saw - patrols left platform area
-            _traps.Add(new RotatingSaw(
-                startPoint: new Vector2(160, 350),
-                endPoint: new Vector2(240, 350),
-                radius: 12
-            ));
-
-            // 7. Bait Object - tempting collectible on center platform
-            _traps.Add(new BaitObject(
-                position: new Vector2(380, 270),
-                size: 12
-            ));
-
-            // 8. Teleport Trap - near right low platform (teleports to left floor)
-            _traps.Add(new TeleportTrap(
-                triggerZone: new Rectangle(650, 355, 40, 40),
-                destination: new Vector2(100, 430)
-            ));
-
-            // 9. Fake Exit - looks like real exit but teleports back
-            _traps.Add(new FakeExit(
-                exitRect: new Rectangle(820, 380, 30, 60),
-                teleportDestination: new Vector2(100, 430)
-            ));
+            _progression.CurrentLevelId = levelId;
         }
 
         protected override void LoadContent()
@@ -179,8 +141,6 @@ namespace SKILL_ISSUE
 
             _placeholderPixel = new Texture2D(GraphicsDevice, 1, 1);
             _placeholderPixel.SetData(new[] { Color.White });
-
-            // Note: _debugFont stays null - we'll draw death counter with primitives for now
         }
 
         protected override void Update(GameTime gameTime)
@@ -189,19 +149,102 @@ namespace SKILL_ISSUE
 
             _inputManager.Update();
 
-            if (_inputManager.PausePressed())
+            switch (_gameState)
+            {
+                case GameState.MainMenu:
+                    UpdateMainMenu();
+                    break;
+
+                case GameState.LevelSelect:
+                    UpdateLevelSelect();
+                    break;
+
+                case GameState.Playing:
+                    UpdatePlaying(gameTime, deltaTime);
+                    break;
+
+                case GameState.Paused:
+                    UpdatePaused();
+                    break;
+
+                case GameState.LevelComplete:
+                    UpdateLevelComplete(deltaTime);
+                    break;
+
+                case GameState.GameComplete:
+                    if (_inputManager.MenuSelectPressed())
+                        _gameState = GameState.MainMenu;
+                    break;
+            }
+
+            base.Update(gameTime);
+        }
+
+        private void UpdateMainMenu()
+        {
+            _mainMenu.Update(
+                _inputManager.MenuUpPressed(),
+                _inputManager.MenuDownPressed(),
+                _inputManager.MenuSelectPressed(),
+                out MenuAction action
+            );
+
+            if (action == MenuAction.StartGame)
+            {
+                _gameState = GameState.LevelSelect;
+            }
+            else if (action == MenuAction.Exit)
+            {
                 Exit();
+            }
+        }
+
+        private void UpdateLevelSelect()
+        {
+            _levelSelectMenu.Update(
+                _inputManager.MenuUpPressed(),
+                _inputManager.MenuDownPressed(),
+                _inputManager.MenuLeftPressed(),
+                _inputManager.MenuRightPressed(),
+                _inputManager.MenuSelectPressed(),
+                _inputManager.MenuBackPressed(),
+                out LevelSelectAction action,
+                out string selectedLevelId
+            );
+
+            if (action == LevelSelectAction.SelectLevel)
+            {
+                LoadLevel(selectedLevelId);
+                _player = new Player(_spawnPosition);
+                _deathCount = 0;
+                _respawnAlpha = 1f;
+                _gameState = GameState.Playing;
+            }
+            else if (action == LevelSelectAction.Back)
+            {
+                _gameState = GameState.MainMenu;
+            }
+        }
+
+        private void UpdatePlaying(GameTime gameTime, float deltaTime)
+        {
+            // Pause
+            if (_inputManager.PausePressed())
+            {
+                _pauseMenu.Reset();
+                _gameState = GameState.Paused;
+                return;
+            }
 
             // Handle death state
             if (_player.IsDead)
             {
                 if (_player.UpdateDeathState(deltaTime))
                 {
-                    // Ready to respawn
                     _player.Respawn(_spawnPosition);
                     _respawnAlpha = 0f;
                 }
-                return; // Skip gameplay update while dead
+                return;
             }
 
             // Fade in after respawn
@@ -212,7 +255,7 @@ namespace SKILL_ISSUE
                     _respawnAlpha = 1f;
             }
 
-            // Manual restart on R key (does NOT count as death)
+            // Manual restart on R key
             if (_inputManager.RestartPressed())
             {
                 _player.Respawn(_spawnPosition);
@@ -224,7 +267,6 @@ namespace SKILL_ISSUE
             float horizontalInput = _inputManager.GetHorizontalInput();
             bool jumpPressed = _inputManager.JumpPressed();
 
-            // Update player physics (calculates velocity, does NOT move position yet)
             _player.Update(deltaTime, horizontalInput, jumpPressed);
 
             // Update all traps
@@ -234,16 +276,15 @@ namespace SKILL_ISSUE
                 trap.Update(gameTime, playerBounds);
             }
 
-            // Now apply movement with collision detection (includes trap solid bounds)
             ApplyMovementWithCollision(deltaTime);
 
-            // Check hazard collision (death from hazard zones)
+            // Check hazard collision
             if (_collisionWorld.IsOverlappingHazard(_player.Bounds))
             {
                 _player.RequestDeath();
             }
 
-            // Check trap hazards (death from active traps)
+            // Check trap hazards
             foreach (var trap in _traps)
             {
                 if (trap.IsHazardous(_player.Bounds))
@@ -253,17 +294,76 @@ namespace SKILL_ISSUE
                 }
             }
 
-            // Handle special trap interactions
             HandleSpecialTraps();
 
-            // Consume death request and increment counter
+            // Check exit collision
+            if (_player.Bounds.Intersects(_exitBounds))
+            {
+                CompleteLevel();
+            }
+
+            // Consume death request
             if (_player.ConsumeDeathRequest())
             {
                 _deathCount++;
                 ResetAllTraps();
             }
+        }
 
-            base.Update(gameTime);
+        private void UpdatePaused()
+        {
+            _pauseMenu.Update(
+                _inputManager.MenuUpPressed(),
+                _inputManager.MenuDownPressed(),
+                _inputManager.MenuSelectPressed(),
+                out PauseAction action
+            );
+
+            if (action == PauseAction.Resume || _inputManager.PausePressed())
+            {
+                _gameState = GameState.Playing;
+            }
+            else if (action == PauseAction.Restart)
+            {
+                _player.Respawn(_spawnPosition);
+                _respawnAlpha = 1f;
+                ResetAllTraps();
+                _deathCount = 0;
+                _gameState = GameState.Playing;
+            }
+            else if (action == PauseAction.MainMenu)
+            {
+                _gameState = GameState.MainMenu;
+            }
+        }
+
+        private void UpdateLevelComplete(float deltaTime)
+        {
+            if (_levelCompleteScreen.Update(deltaTime))
+            {
+                // Proceed to next level or game complete
+                string nextLevel = _progression.GetNextLevelId(_progression.CurrentLevelId);
+
+                if (!string.IsNullOrEmpty(nextLevel) && _progression.IsLevelUnlocked(nextLevel))
+                {
+                    _deathCount = 0;
+                    LoadLevel(nextLevel);
+                    _player.Respawn(_spawnPosition);
+                    _respawnAlpha = 1f;
+                    _gameState = GameState.Playing;
+                }
+                else
+                {
+                    _gameState = GameState.GameComplete;
+                }
+            }
+        }
+
+        private void CompleteLevel()
+        {
+            _progression.CompleteLevel(_progression.CurrentLevelId);
+            _levelCompleteScreen.Start();
+            _gameState = GameState.LevelComplete;
         }
 
         private void HandleSpecialTraps()
@@ -464,10 +564,46 @@ namespace SKILL_ISSUE
 
             _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
 
-            DrawLevel();
-            DrawTraps();
-            DrawPlayer();
-            DrawDeathCounter();
+            switch (_gameState)
+            {
+                case GameState.MainMenu:
+                    _mainMenu.Draw(_spriteBatch, _placeholderPixel);
+                    break;
+
+                case GameState.LevelSelect:
+                    _levelSelectMenu.Draw(_spriteBatch, _placeholderPixel);
+                    break;
+
+                case GameState.Playing:
+                    DrawLevel();
+                    DrawTraps();
+                    DrawPlayer();
+                    DrawDeathCounter();
+                    break;
+
+                case GameState.Paused:
+                    DrawLevel();
+                    DrawTraps();
+                    DrawPlayer();
+                    DrawDeathCounter();
+                    _pauseMenu.Draw(_spriteBatch, _placeholderPixel);
+                    break;
+
+                case GameState.LevelComplete:
+                    DrawLevel();
+                    DrawTraps();
+                    DrawPlayer();
+                    string nextLevel = _progression.GetNextLevelId(_progression.CurrentLevelId);
+                    bool isLastLevel = string.IsNullOrEmpty(nextLevel) || !_progression.IsLevelUnlocked(nextLevel);
+                    _levelCompleteScreen.Draw(_spriteBatch, _placeholderPixel, _currentLevel.Name, _deathCount, isLastLevel);
+                    break;
+
+                case GameState.GameComplete:
+                    UIHelper.DrawCenteredText(_spriteBatch, _placeholderPixel, "CONGRATULATIONS!", 180, new Color(220, 50, 80), 2);
+                    UIHelper.DrawCenteredText(_spriteBatch, _placeholderPixel, "YOU COMPLETED ALL LEVELS", 240, new Color(200, 200, 200), 1);
+                    UIHelper.DrawCenteredText(_spriteBatch, _placeholderPixel, "PRESS SPACE TO RETURN", 320, new Color(150, 150, 150), 1);
+                    break;
+            }
 
             _spriteBatch.End();
 
@@ -486,28 +622,42 @@ namespace SKILL_ISSUE
 
         private void DrawLevel()
         {
-            // Floor with GAP in middle
-            _spriteBatch.Draw(_placeholderPixel, new Rectangle(0, 460, 300, 80), new Color(60, 40, 70));
-            _spriteBatch.Draw(_placeholderPixel, new Rectangle(500, 460, 460, 80), new Color(60, 40, 70));
+            if (_currentLevel == null)
+                return;
 
-            // Walls
-            _spriteBatch.Draw(_placeholderPixel, new Rectangle(0, 0, 40, 540), new Color(40, 25, 50));
-            _spriteBatch.Draw(_placeholderPixel, new Rectangle(920, 0, 40, 540), new Color(40, 25, 50));
+            // Draw platforms
+            foreach (var platform in _currentLevel.Platforms)
+            {
+                Rectangle rect = new Rectangle(platform.X, platform.Y, platform.Width, platform.Height);
+                Color platformColor = new Color(100, 80, 70);
 
-            // Platforms - heights respect 95px max jump (jump velocity increased to -550)
-            _spriteBatch.Draw(_placeholderPixel, new Rectangle(140, 375, 120, 20), new Color(150, 100, 120)); // Left: 55px from spawn - EASY
-            _spriteBatch.Draw(_placeholderPixel, new Rectangle(320, 290, 200, 20), new Color(180, 120, 140)); // Center: 85px from left
-            _spriteBatch.Draw(_placeholderPixel, new Rectangle(600, 375, 120, 20), new Color(150, 100, 120)); // Right: same as left
-            _spriteBatch.Draw(_placeholderPixel, new Rectangle(380, 210, 140, 20), new Color(200, 140, 160)); // High: 80px from center
+                // Different colors for walls vs floors
+                if (platform.Width < 50)
+                    platformColor = new Color(40, 25, 50); // Walls
+                else if (platform.Height > 50)
+                    platformColor = new Color(60, 40, 70); // Floor
 
-            // Draw GAP clearly with darker background and hazard warning
-            _spriteBatch.Draw(_placeholderPixel, new Rectangle(300, 400, 200, 140), new Color(10, 5, 15)); // Dark void
+                _spriteBatch.Draw(_placeholderPixel, rect, platformColor);
+            }
 
-            // Hazard zone indicator (bright red at bottom - visible death zone)
-            _spriteBatch.Draw(_placeholderPixel, new Rectangle(0, 480, 960, 60), new Color(220, 50, 80, 80));
+            // Draw hazard zones (semi-transparent red)
+            foreach (var hazard in _currentLevel.Hazards)
+            {
+                Rectangle rect = new Rectangle(hazard.X, hazard.Y, hazard.Width, hazard.Height);
+                _spriteBatch.Draw(_placeholderPixel, rect, new Color(220, 50, 80, 80));
+            }
 
-            // Exit marker (crimson) - on right floor
-            _spriteBatch.Draw(_placeholderPixel, new Rectangle(860, 380, 40, 60), new Color(220, 50, 80));
+            // Draw exit (bright crimson)
+            _spriteBatch.Draw(_placeholderPixel, _exitBounds, new Color(220, 50, 80));
+
+            // Exit inner frame
+            Rectangle exitFrame = new Rectangle(
+                _exitBounds.X + 8,
+                _exitBounds.Y + 8,
+                _exitBounds.Width - 16,
+                _exitBounds.Height - 16
+            );
+            _spriteBatch.Draw(_placeholderPixel, exitFrame, new Color(40, 20, 30));
         }
 
         private void DrawTraps()
