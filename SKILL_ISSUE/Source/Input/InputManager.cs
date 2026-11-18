@@ -77,11 +77,11 @@ namespace SKILL_ISSUE.Input
         }
 
         /// <summary>
-        /// Check if jump was requested (W or Space pressed this frame).
+        /// Check if jump was requested (W, Space, or Up Arrow pressed this frame).
         /// </summary>
         public bool JumpPressed()
         {
-            return WasPressed(Keys.W) || WasPressed(Keys.Space);
+            return WasPressed(Keys.W) || WasPressed(Keys.Space) || WasPressed(Keys.Up);
         }
 
         /// <summary>

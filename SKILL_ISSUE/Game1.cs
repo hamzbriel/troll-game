@@ -5,6 +5,7 @@ using SKILL_ISSUE.Core;
 using SKILL_ISSUE.Graphics;
 using SKILL_ISSUE.Input;
 using SKILL_ISSUE.Entities;
+using SKILL_ISSUE.Physics;
 
 namespace SKILL_ISSUE
 {
@@ -18,12 +19,13 @@ namespace SKILL_ISSUE
         // Game systems
         private InputManager _inputManager;
         private Player _player;
+        private CollisionWorld _collisionWorld;
 
-        // Temporary placeholder visuals for Milestone 1-2
+        // Temporary placeholder visuals
         private Texture2D _placeholderPixel;
 
-        // Temporary ground level for testing
-        private const float GroundY = 460f;
+        // Spawn point
+        private readonly Vector2 _spawnPosition = new Vector2(100, 400);
 
         public Game1()
         {
@@ -31,10 +33,8 @@ namespace SKILL_ISSUE
             Content.RootDirectory = "Content";
             IsMouseVisible = true;
 
-            // Set window title
             Window.Title = GameConfig.WindowTitle;
 
-            // Set initial window size (can be resized, viewport will adapt)
             _graphics.PreferredBackBufferWidth = GameConfig.LogicalWidth;
             _graphics.PreferredBackBufferHeight = GameConfig.LogicalHeight;
             _graphics.ApplyChanges();
@@ -42,10 +42,8 @@ namespace SKILL_ISSUE
 
         protected override void Initialize()
         {
-            // Create viewport scaler for aspect-ratio-preserving rendering
             _viewportScaler = new ViewportScaler(GraphicsDevice, GameConfig.LogicalWidth, GameConfig.LogicalHeight);
 
-            // Create render target for logical 960×540 canvas
             _logicalRenderTarget = new RenderTarget2D(
                 GraphicsDevice,
                 GameConfig.LogicalWidth,
@@ -57,18 +55,49 @@ namespace SKILL_ISSUE
                 RenderTargetUsage.DiscardContents
             );
 
-            // Initialize game systems
             _inputManager = new InputManager();
-            _player = new Player(new Vector2(100, GroundY - GameConfig.PlayerHeight));
+            _player = new Player(_spawnPosition);
+            _collisionWorld = new CollisionWorld();
+
+            // Build test level geometry
+            BuildTestLevel();
 
             base.Initialize();
+        }
+
+        private void BuildTestLevel()
+        {
+            _collisionWorld.Clear();
+
+            // Floor (bottom 80px)
+            _collisionWorld.AddSolidPlatform(new Rectangle(0, 460, 960, 80));
+
+            // Left wall
+            _collisionWorld.AddSolidPlatform(new Rectangle(0, 0, 40, 540));
+
+            // Right wall
+            _collisionWorld.AddSolidPlatform(new Rectangle(920, 0, 40, 540));
+
+            // Center elevated platform
+            _collisionWorld.AddSolidPlatform(new Rectangle(380, 320, 200, 20));
+
+            // Left step platform
+            _collisionWorld.AddSolidPlatform(new Rectangle(120, 380, 100, 20));
+
+            // Right step platform
+            _collisionWorld.AddSolidPlatform(new Rectangle(740, 380, 100, 20));
+
+            // High platform (requires jump from center)
+            _collisionWorld.AddSolidPlatform(new Rectangle(420, 220, 120, 20));
+
+            // Fall boundary (death zone below screen)
+            _collisionWorld.AddHazard(new Rectangle(-100, 550, 1160, 100));
         }
 
         protected override void LoadContent()
         {
             _spriteBatch = new SpriteBatch(GraphicsDevice);
 
-            // Create 1×1 white pixel for placeholder rendering
             _placeholderPixel = new Texture2D(GraphicsDevice, 1, 1);
             _placeholderPixel.SetData(new[] { Color.White });
         }
@@ -77,71 +106,101 @@ namespace SKILL_ISSUE
         {
             float deltaTime = (float)gameTime.ElapsedGameTime.TotalSeconds;
 
-            // Update input state
             _inputManager.Update();
 
-            // Exit on Escape (temporary - will be pause menu later)
             if (_inputManager.PausePressed())
                 Exit();
+
+            // Restart on R key
+            if (_inputManager.RestartPressed())
+            {
+                _player.Respawn(_spawnPosition);
+            }
 
             // Get player input
             float horizontalInput = _inputManager.GetHorizontalInput();
             bool jumpPressed = _inputManager.JumpPressed();
 
-            // Update player physics
+            // Update player physics (calculates velocity, does NOT move position yet)
             _player.Update(deltaTime, horizontalInput, jumpPressed);
 
-            // Temporary ground collision (Milestone 3 will have proper collision system)
-            HandleTemporaryGroundCollision();
+            // Now apply movement with collision detection
+            ApplyMovementWithCollision(deltaTime);
+
+            // Check hazard collision (death)
+            if (_collisionWorld.IsOverlappingHazard(_player.Bounds))
+            {
+                _player.Respawn(_spawnPosition);
+            }
 
             base.Update(gameTime);
         }
 
-        private void HandleTemporaryGroundCollision()
+        private void ApplyMovementWithCollision(float deltaTime)
         {
-            // Simple ground check for testing
-            if (_player.Position.Y + GameConfig.PlayerHeight >= GroundY)
+            Vector2 startPosition = _player.Position;
+            Vector2 desiredPosition = startPosition + _player.Velocity * deltaTime;
+
+            // Apply horizontal movement with collision
+            Vector2 afterHorizontal = new Vector2(desiredPosition.X, startPosition.Y);
+            bool hitWall = _collisionWorld.ResolveHorizontal(
+                ref afterHorizontal,
+                GameConfig.PlayerWidth,
+                GameConfig.PlayerHeight,
+                _player.Velocity
+            );
+
+            if (hitWall)
             {
-                _player.Position = new Vector2(_player.Position.X, GroundY - GameConfig.PlayerHeight);
-                _player.Land();
-            }
-            else
-            {
-                _player.IsGrounded = false;
+                _player.StopHorizontal();
             }
 
-            // Temporary side boundaries
-            if (_player.Position.X < 40)
+            // Apply vertical movement with collision
+            Vector2 finalPosition = new Vector2(afterHorizontal.X, desiredPosition.Y);
+            var verticalResult = _collisionWorld.ResolveVertical(
+                ref finalPosition,
+                GameConfig.PlayerWidth,
+                GameConfig.PlayerHeight,
+                _player.Velocity
+            );
+
+            // Update player position
+            _player.Position = finalPosition;
+
+            // Handle vertical collision results
+            if (verticalResult == VerticalCollisionResult.Landing)
             {
-                _player.Position = new Vector2(40, _player.Position.Y);
-                _player.StopHorizontal();
+                _player.Land();
             }
-            if (_player.Position.X > 896) // 960 - 40 - 24
+            else if (verticalResult == VerticalCollisionResult.HitCeiling)
             {
-                _player.Position = new Vector2(896, _player.Position.Y);
-                _player.StopHorizontal();
+                _player.HitCeiling();
             }
+
+            // Update grounded state
+            _player.IsGrounded = _collisionWorld.IsGrounded(
+                _player.Position,
+                GameConfig.PlayerWidth,
+                GameConfig.PlayerHeight
+            );
         }
 
         protected override void Draw(GameTime gameTime)
         {
-            // Step 1: Draw to logical 960×540 render target
+            // Draw to logical canvas
             GraphicsDevice.SetRenderTarget(_logicalRenderTarget);
-            GraphicsDevice.Clear(new Color(20, 12, 28)); // Dark purple background
+            GraphicsDevice.Clear(new Color(20, 12, 28));
 
-            _spriteBatch.Begin(samplerState: SamplerState.PointClamp); // Pixel-art sampling
+            _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
 
-            // Placeholder scene
-            DrawPlaceholderScene();
-
-            // Draw player at current position
+            DrawLevel();
             DrawPlayer();
 
             _spriteBatch.End();
 
-            // Step 2: Draw logical canvas to screen with aspect ratio preservation
+            // Draw to screen with scaling
             GraphicsDevice.SetRenderTarget(null);
-            GraphicsDevice.Clear(Color.Black); // Letterbox bars
+            GraphicsDevice.Clear(Color.Black);
 
             Rectangle viewport = _viewportScaler.GetScaledViewport();
 
@@ -152,27 +211,27 @@ namespace SKILL_ISSUE
             base.Draw(gameTime);
         }
 
-        private void DrawPlaceholderScene()
+        private void DrawLevel()
         {
-            // Floor (bottom 80px)
+            // Floor
             _spriteBatch.Draw(_placeholderPixel, new Rectangle(0, 460, 960, 80), new Color(60, 40, 70));
 
-            // Left wall
+            // Walls
             _spriteBatch.Draw(_placeholderPixel, new Rectangle(0, 0, 40, 540), new Color(40, 25, 50));
-
-            // Right wall
             _spriteBatch.Draw(_placeholderPixel, new Rectangle(920, 0, 40, 540), new Color(40, 25, 50));
 
-            // Platform (center, elevated) - will be solid collision in Milestone 3
+            // Platforms (color by height for visual distinction)
             _spriteBatch.Draw(_placeholderPixel, new Rectangle(380, 320, 200, 20), new Color(180, 120, 140));
+            _spriteBatch.Draw(_placeholderPixel, new Rectangle(120, 380, 100, 20), new Color(150, 100, 120));
+            _spriteBatch.Draw(_placeholderPixel, new Rectangle(740, 380, 100, 20), new Color(150, 100, 120));
+            _spriteBatch.Draw(_placeholderPixel, new Rectangle(420, 220, 120, 20), new Color(200, 140, 160));
 
-            // Exit placeholder (crimson rectangle, top-right)
+            // Exit marker (crimson)
             _spriteBatch.Draw(_placeholderPixel, new Rectangle(860, 380, 40, 60), new Color(220, 50, 80));
         }
 
         private void DrawPlayer()
         {
-            // Draw player as white rectangle at physics position
             Rectangle playerRect = new Rectangle(
                 (int)_player.Position.X,
                 (int)_player.Position.Y,
@@ -180,7 +239,6 @@ namespace SKILL_ISSUE
                 GameConfig.PlayerHeight
             );
 
-            // Tint slightly based on state (visual feedback)
             Color playerColor = _player.IsGrounded ? Color.White : new Color(255, 255, 200);
 
             _spriteBatch.Draw(_placeholderPixel, playerRect, playerColor);

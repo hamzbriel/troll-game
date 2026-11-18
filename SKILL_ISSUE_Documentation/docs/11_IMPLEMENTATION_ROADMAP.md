@@ -62,11 +62,31 @@ Tasks:
 - Add grounded state and basic player states.
 
 Acceptance:
-- [ ] A/Left moves left.
-- [ ] D/Right moves right.
-- [ ] W jumps only when allowed.
-- [ ] Holding W does not auto-jump.
-- [ ] Movement is frame-rate independent.
+- [x] A/Left moves left.
+- [x] D/Right moves right.
+- [x] W jumps only when allowed.
+- [x] Holding W does not auto-jump.
+- [x] Movement is frame-rate independent.
+
+**Completed:** 18 Nov 2026  
+**Files created:**
+- `Source/Input/InputManager.cs` - Keyboard state tracking with edge detection
+- `Source/Entities/Player.cs` - Physics-based player movement
+- Modified `Game1.cs` - Input polling, player update, temporary ground collision
+
+**Physics implemented:**
+- Time-based integration using GameTime.ElapsedGameTime
+- Horizontal acceleration/deceleration (different for ground/air)
+- Gravity with terminal velocity
+- Edge-triggered jump (no auto-jump on hold)
+- Coyote time (0.08s grace period after leaving ground)
+- Jump buffer (0.10s early input tolerance)
+- Velocity clamping to max speed/fall speed
+
+**Temporary collision:**
+- Ground plane at Y=460
+- Side walls for boundary testing
+- Proper collision system in Milestone 3
 
 ## Milestone 3 — Platforms and collision
 
@@ -77,11 +97,35 @@ Tasks:
 - Add fall boundary.
 
 Acceptance:
-- [ ] Player stands on floor.
-- [ ] Player cannot pass through walls/floor.
-- [ ] Player can land on platforms.
-- [ ] Player falls when unsupported.
-- [ ] No obvious tunneling at normal movement speeds.
+- [x] Player stands on floor.
+- [x] Player cannot pass through walls/floor.
+- [x] Player can land on platforms.
+- [x] Player falls when unsupported.
+- [x] No obvious tunneling at normal movement speeds.
+
+**Completed:** 18 Nov 2026  
+**Files created:**
+- `Source/Physics/CollisionWorld.cs` - AABB collision detection and resolution
+- Modified `Game1.cs` - Platform definitions, collision integration, R restart
+
+**Collision features:**
+- Solid platform AABB detection
+- Separate horizontal/vertical collision resolution
+- Landing detection (grounded state)
+- Ceiling hit detection
+- Wall collision with horizontal stop
+- Hazard zones (death on overlap)
+- IsGrounded check (1px below feet)
+
+**Test level geometry:**
+- Floor + side walls
+- 4 elevated platforms at different heights
+- Fall boundary below screen (death zone)
+- Exit marker placeholder
+
+**Controls updated:**
+- W/Space/Up Arrow → Jump
+- R → Restart level
 
 ## Milestone 4 — Death, respawn, and counter
 

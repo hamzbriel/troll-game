@@ -1,4 +1,5 @@
 using Microsoft.Xna.Framework;
+using System;
 using SKILL_ISSUE.Core;
 
 namespace SKILL_ISSUE.Entities
@@ -38,6 +39,8 @@ namespace SKILL_ISSUE.Entities
 
         /// <summary>
         /// Update player physics and movement.
+        /// Calculates velocity based on input and physics, but does NOT update position.
+        /// Position update happens in Game1 with collision resolution.
         /// </summary>
         /// <param name="deltaTime">Elapsed seconds since last frame</param>
         /// <param name="horizontalInput">-1 (left), 0 (none), +1 (right)</param>
@@ -79,8 +82,7 @@ namespace SKILL_ISSUE.Entities
             // Apply gravity
             ApplyGravity(deltaTime);
 
-            // Apply velocity to position
-            Position += Velocity * deltaTime;
+            // NOTE: Position is NOT updated here - Game1 handles position integration with collision
         }
 
         private void UpdateHorizontalMovement(float deltaTime, float horizontalInput)
@@ -92,37 +94,41 @@ namespace SKILL_ISSUE.Entities
             {
                 // Accelerate toward target speed
                 float targetSpeed = horizontalInput * GameConfig.PlayerMaxSpeed;
-                Velocity.X = MoveTowards(Velocity.X, targetSpeed, acceleration * deltaTime);
+                float newVelocityX = MoveTowards(Velocity.X, targetSpeed, acceleration * deltaTime);
+                Velocity = new Vector2(newVelocityX, Velocity.Y);
             }
             else if (IsGrounded)
             {
                 // Decelerate to stop when grounded and no input
-                Velocity.X = MoveTowards(Velocity.X, 0f, deceleration * deltaTime);
+                float newVelocityX = MoveTowards(Velocity.X, 0f, deceleration * deltaTime);
+                Velocity = new Vector2(newVelocityX, Velocity.Y);
             }
             // In air with no input: maintain momentum (no air friction yet)
 
             // Clamp to max speed
             if (Velocity.X > GameConfig.PlayerMaxSpeed)
-                Velocity.X = GameConfig.PlayerMaxSpeed;
+                Velocity = new Vector2(GameConfig.PlayerMaxSpeed, Velocity.Y);
             if (Velocity.X < -GameConfig.PlayerMaxSpeed)
-                Velocity.X = -GameConfig.PlayerMaxSpeed;
+                Velocity = new Vector2(-GameConfig.PlayerMaxSpeed, Velocity.Y);
         }
 
         private void ApplyGravity(float deltaTime)
         {
             if (!IsGrounded)
             {
-                Velocity.Y += GameConfig.Gravity * deltaTime;
+                float newVelocityY = Velocity.Y + GameConfig.Gravity * deltaTime;
 
                 // Clamp to max fall speed
-                if (Velocity.Y > GameConfig.MaxFallSpeed)
-                    Velocity.Y = GameConfig.MaxFallSpeed;
+                if (newVelocityY > GameConfig.MaxFallSpeed)
+                    newVelocityY = GameConfig.MaxFallSpeed;
+
+                Velocity = new Vector2(Velocity.X, newVelocityY);
             }
         }
 
         private void Jump()
         {
-            Velocity.Y = GameConfig.JumpVelocity;
+            Velocity = new Vector2(Velocity.X, GameConfig.JumpVelocity);
             IsGrounded = false;
             _coyoteTimeCounter = 0f;
         }
@@ -134,7 +140,7 @@ namespace SKILL_ISSUE.Entities
         {
             IsGrounded = true;
             if (Velocity.Y > 0)
-                Velocity.Y = 0;
+                Velocity = new Vector2(Velocity.X, 0);
         }
 
         /// <summary>
@@ -143,7 +149,7 @@ namespace SKILL_ISSUE.Entities
         public void HitCeiling()
         {
             if (Velocity.Y < 0)
-                Velocity.Y = 0;
+                Velocity = new Vector2(Velocity.X, 0);
         }
 
         /// <summary>
@@ -151,7 +157,7 @@ namespace SKILL_ISSUE.Entities
         /// </summary>
         public void StopHorizontal()
         {
-            Velocity.X = 0;
+            Velocity = new Vector2(0, Velocity.Y);
         }
 
         /// <summary>
@@ -166,10 +172,10 @@ namespace SKILL_ISSUE.Entities
 
         private float MoveTowards(float current, float target, float maxDelta)
         {
-            if (MathF.Abs(target - current) <= maxDelta)
+            if (Math.Abs(target - current) <= maxDelta)
                 return target;
 
-            return current + MathF.Sign(target - current) * maxDelta;
+            return current + Math.Sign(target - current) * maxDelta;
         }
     }
 }
