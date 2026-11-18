@@ -24,17 +24,66 @@ namespace SKILL_ISSUE.Entities
 
         // State tracking
         public bool IsGrounded { get; set; }
+        public bool IsDead { get; private set; }
+
         private bool _wasGrounded;
 
         // Jump buffering and coyote time
         private float _coyoteTimeCounter;
         private float _jumpBufferCounter;
 
+        // Death state
+        private float _deathTimer;
+        private bool _deathRequested;
+
         public Player(Vector2 startPosition)
         {
             Position = startPosition;
             Velocity = Vector2.Zero;
             IsGrounded = false;
+            IsDead = false;
+            _deathRequested = false;
+        }
+
+        /// <summary>
+        /// Request player death. Prevents repeated death increments.
+        /// </summary>
+        public void RequestDeath()
+        {
+            if (!IsDead && !_deathRequested)
+            {
+                _deathRequested = true;
+            }
+        }
+
+        /// <summary>
+        /// Check if death was requested this frame and consume the request.
+        /// Used by Game1 to increment death counter once.
+        /// </summary>
+        public bool ConsumeDeathRequest()
+        {
+            if (_deathRequested)
+            {
+                _deathRequested = false;
+                IsDead = true;
+                _deathTimer = GameConfig.DeathFreezeTime;
+                Velocity = Vector2.Zero;
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Update death timer. Returns true when ready to respawn.
+        /// </summary>
+        public bool UpdateDeathState(float deltaTime)
+        {
+            if (IsDead)
+            {
+                _deathTimer -= deltaTime;
+                return _deathTimer <= 0f;
+            }
+            return false;
         }
 
         /// <summary>
@@ -47,6 +96,9 @@ namespace SKILL_ISSUE.Entities
         /// <param name="jumpPressed">True if jump was requested this frame</param>
         public void Update(float deltaTime, float horizontalInput, bool jumpPressed)
         {
+            if (IsDead)
+                return;
+
             _wasGrounded = IsGrounded;
 
             // Update coyote time (grace period for jumping after leaving ground)
@@ -168,6 +220,9 @@ namespace SKILL_ISSUE.Entities
             Position = spawnPosition;
             Velocity = Vector2.Zero;
             IsGrounded = false;
+            IsDead = false;
+            _deathRequested = false;
+            _deathTimer = 0f;
         }
 
         private float MoveTowards(float current, float target, float maxDelta)

@@ -17,7 +17,7 @@ namespace SKILL_ISSUE.Core
         public const float PlayerGroundDecel = 2200f;       // px/s²
         public const float PlayerAirAccel = 1100f;          // px/s²
         public const float Gravity = 1500f;                 // px/s²
-        public const float JumpVelocity = -520f;            // px/s (negative = upward)
+        public const float JumpVelocity = -550f;            // px/s (negative = upward) - INCREASED from -520
         public const float MaxFallSpeed = 850f;             // px/s
 
         // Optional player features
@@ -27,5 +27,15 @@ namespace SKILL_ISSUE.Core
         // Player collision size (initial, adjust with final sprite)
         public const int PlayerWidth = 24;
         public const int PlayerHeight = 30;
+
+        // Death and respawn
+        public const float DeathFreezeTime = 0.3f;          // seconds before respawn starts
+        public const float RespawnFadeTime = 0.2f;          // seconds for fade in after respawn
+
+        // IMPORTANT: Maximum jump height calculation
+        // Formula: max_height = velocity² / (2 * gravity)
+        // max_height = 550² / (2 * 1500) = 302500 / 3000 = 100.83 pixels
+        // SAFE PLATFORM GAP: 95 pixels vertical (leave 5px margin for safety)
+        public const int MaxJumpHeight = 95;                // Safe vertical gap between platforms
     }
 }

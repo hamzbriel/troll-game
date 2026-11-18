@@ -137,11 +137,26 @@ Tasks:
 - Add R restart behavior.
 
 Acceptance:
-- [ ] Hazard/fall causes one death increment.
-- [ ] Respawn is automatic and unlimited.
-- [ ] Death count is retained after respawn.
-- [ ] R restarts level without counting as death by default.
-- [ ] No repeated death increments during one death sequence.
+- [x] Hazard/fall causes one death increment.
+- [x] Respawn is automatic and unlimited.
+- [x] Death count is retained after respawn.
+- [x] R restarts level without counting as death by default.
+- [x] No repeated death increments during one death sequence.
+
+**Completed:** 18 Nov 2026  
+**Files modified:**
+- `Source/Core/GameConfig.cs` - Death/respawn timing constants
+- `Source/Entities/Player.cs` - Death state machine, RequestDeath(), IsDead flag
+- `Game1.cs` - Death counter tracking, death freeze, respawn fade-in, visual counter
+
+**Death system features:**
+- Request/consume pattern prevents double-counting
+- 0.3s death freeze before respawn
+- 0.2s fade-in alpha after respawn
+- Manual restart (R key) does NOT increment counter
+- Death counter displayed as crimson bars (placeholder for font)
+- Player hidden during death state
+- Unlimited retries maintained
 
 ## Milestone 5 — Trap framework
 
