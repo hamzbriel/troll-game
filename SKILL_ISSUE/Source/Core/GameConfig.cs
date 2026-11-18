@@ -37,5 +37,27 @@ namespace SKILL_ISSUE.Core
         // max_height = 550² / (2 * 1500) = 302500 / 3000 = 100.83 pixels
         // SAFE PLATFORM GAP: 95 pixels vertical (leave 5px margin for safety)
         public const int MaxJumpHeight = 95;                // Safe vertical gap between platforms
+
+        // Trap timing (deterministic state transitions)
+        public const float SpikeWarningTime = 0.4f;         // seconds before spikes extend
+        public const float SpikeExtendTime = 0.15f;         // seconds to fully extend
+        public const float SpikeActiveTime = 1.5f;          // seconds spikes stay extended
+        public const float SpikeRetractTime = 0.15f;        // seconds to retract
+
+        public const float FakePlatformWarningTime = 0.3f;  // seconds of shaking/cracking
+        public const float FakePlatformFallTime = 0.2f;     // seconds to disappear
+
+        public const float DisappearFloorWarningTime = 0.25f;
+        public const float DisappearFloorGoneTime = 2.0f;   // seconds before reappearing
+
+        public const float FallingBlockWarningTime = 0.4f;
+        public const float FallingBlockSpeed = 600f;        // px/s
+
+        public const float MovingPlatformSpeed = 80f;       // px/s
+        public const float SawRotationSpeed = 3f;           // radians/s
+        public const int SawRadius = 15;                    // pixels
+
+        public const float TeleportCooldown = 0.5f;         // seconds before reactivation
+        public const float BaitObjectPulseSpeed = 2f;       // Hz
     }
 }

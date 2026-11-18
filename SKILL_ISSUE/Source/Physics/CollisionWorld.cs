@@ -44,6 +44,14 @@ namespace SKILL_ISSUE.Physics
         }
 
         /// <summary>
+        /// Get all solid platforms (for trap collision integration).
+        /// </summary>
+        public List<Rectangle> GetSolidPlatforms()
+        {
+            return _solidPlatforms;
+        }
+
+        /// <summary>
         /// Check if player bounds overlap any solid platform.
         /// Returns the first overlapping platform, or null if none.
         /// </summary>

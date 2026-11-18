@@ -6,6 +6,8 @@ using SKILL_ISSUE.Graphics;
 using SKILL_ISSUE.Input;
 using SKILL_ISSUE.Entities;
 using SKILL_ISSUE.Physics;
+using SKILL_ISSUE.Traps;
+using System.Collections.Generic;
 
 namespace SKILL_ISSUE
 {
@@ -20,6 +22,7 @@ namespace SKILL_ISSUE
         private InputManager _inputManager;
         private Player _player;
         private CollisionWorld _collisionWorld;
+        private List<TrapBase> _traps;
 
         // Game state
         private int _deathCount;
@@ -63,6 +66,7 @@ namespace SKILL_ISSUE
             _inputManager = new InputManager();
             _player = new Player(_spawnPosition);
             _collisionWorld = new CollisionWorld();
+            _traps = new List<TrapBase>();
             _deathCount = 0;
             _respawnAlpha = 1f;
 
@@ -75,6 +79,7 @@ namespace SKILL_ISSUE
         private void BuildTestLevel()
         {
             _collisionWorld.Clear();
+            _traps.Clear();
 
             // Main floor - NOT full width, has GAP in middle for death testing
             _collisionWorld.AddSolidPlatform(new Rectangle(0, 460, 300, 80));     // Left floor
@@ -104,6 +109,33 @@ namespace SKILL_ISSUE
 
             // Hazard zone - covers GAP and bottom area
             _collisionWorld.AddHazard(new Rectangle(0, 480, 960, 100));
+
+            // === TRAP DEMONSTRATIONS ===
+
+            // 1. Hidden Spikes - on right floor section
+            _traps.Add(new HiddenSpikes(
+                triggerBounds: new Rectangle(700, 400, 100, 60),
+                spikeBasePosition: new Rectangle(700, 460, 100, 10)
+            ));
+
+            // 2. Fake Platform - center platform replacement (make one section fake)
+            _traps.Add(new FakePlatform(
+                platformRect: new Rectangle(420, 290, 80, 20)
+            ));
+
+            // 3. Disappearing Floor - left floor section near spawn
+            _traps.Add(new DisappearingFloor(
+                triggerZone: new Rectangle(200, 300, 60, 100),
+                floorRect: new Rectangle(200, 460, 80, 20)
+            ));
+
+            // 4. Falling Block - above high platform
+            _traps.Add(new FallingBlock(
+                triggerZone: new Rectangle(380, 210, 140, 20),
+                blockStartPosition: new Vector2(400, 100),
+                width: 40,
+                height: 40
+            ));
         }
 
         protected override void LoadContent()
@@ -150,6 +182,7 @@ namespace SKILL_ISSUE
             {
                 _player.Respawn(_spawnPosition);
                 _respawnAlpha = 1f;
+                ResetAllTraps();
             }
 
             // Get player input
@@ -159,22 +192,48 @@ namespace SKILL_ISSUE
             // Update player physics (calculates velocity, does NOT move position yet)
             _player.Update(deltaTime, horizontalInput, jumpPressed);
 
-            // Now apply movement with collision detection
+            // Update all traps
+            Rectangle playerBounds = _player.Bounds;
+            foreach (var trap in _traps)
+            {
+                trap.Update(gameTime, playerBounds);
+            }
+
+            // Now apply movement with collision detection (includes trap solid bounds)
             ApplyMovementWithCollision(deltaTime);
 
-            // Check hazard collision (death)
+            // Check hazard collision (death from hazard zones)
             if (_collisionWorld.IsOverlappingHazard(_player.Bounds))
             {
                 _player.RequestDeath();
+            }
+
+            // Check trap hazards (death from active traps)
+            foreach (var trap in _traps)
+            {
+                if (trap.IsHazardous(_player.Bounds))
+                {
+                    _player.RequestDeath();
+                    break;
+                }
             }
 
             // Consume death request and increment counter
             if (_player.ConsumeDeathRequest())
             {
                 _deathCount++;
+                ResetAllTraps();
             }
 
             base.Update(gameTime);
+        }
+
+        private void ResetAllTraps()
+        {
+            foreach (var trap in _traps)
+            {
+                trap.Reset();
+            }
         }
 
         private void ApplyMovementWithCollision(float deltaTime)
@@ -182,12 +241,21 @@ namespace SKILL_ISSUE
             Vector2 startPosition = _player.Position;
             Vector2 desiredPosition = startPosition + _player.Velocity * deltaTime;
 
+            // Collect all solid bounds (platforms + solid traps)
+            List<Rectangle> allSolidBounds = new List<Rectangle>(_collisionWorld.GetSolidPlatforms());
+            foreach (var trap in _traps)
+            {
+                if (trap.IsSolid())
+                {
+                    allSolidBounds.Add(trap.SolidBounds);
+                }
+            }
+
             // Apply horizontal movement with collision
             Vector2 afterHorizontal = new Vector2(desiredPosition.X, startPosition.Y);
-            bool hitWall = _collisionWorld.ResolveHorizontal(
+            bool hitWall = ResolveHorizontalCollision(
                 ref afterHorizontal,
-                GameConfig.PlayerWidth,
-                GameConfig.PlayerHeight,
+                allSolidBounds,
                 _player.Velocity
             );
 
@@ -198,10 +266,9 @@ namespace SKILL_ISSUE
 
             // Apply vertical movement with collision
             Vector2 finalPosition = new Vector2(afterHorizontal.X, desiredPosition.Y);
-            var verticalResult = _collisionWorld.ResolveVertical(
+            var verticalResult = ResolveVerticalCollision(
                 ref finalPosition,
-                GameConfig.PlayerWidth,
-                GameConfig.PlayerHeight,
+                allSolidBounds,
                 _player.Velocity
             );
 
@@ -218,12 +285,83 @@ namespace SKILL_ISSUE
                 _player.HitCeiling();
             }
 
-            // Update grounded state
-            _player.IsGrounded = _collisionWorld.IsGrounded(
+            // Update grounded state (check against all solid bounds)
+            _player.IsGrounded = IsGroundedAgainstBounds(
                 _player.Position,
+                allSolidBounds
+            );
+        }
+
+        private bool ResolveHorizontalCollision(ref Vector2 position, List<Rectangle> solidBounds, Vector2 velocity)
+        {
+            Rectangle playerBounds = new Rectangle(
+                (int)position.X,
+                (int)position.Y,
                 GameConfig.PlayerWidth,
                 GameConfig.PlayerHeight
             );
+
+            foreach (var platform in solidBounds)
+            {
+                if (playerBounds.Intersects(platform))
+                {
+                    if (velocity.X > 0)
+                        position.X = platform.Left - GameConfig.PlayerWidth;
+                    else if (velocity.X < 0)
+                        position.X = platform.Right;
+
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private VerticalCollisionResult ResolveVerticalCollision(ref Vector2 position, List<Rectangle> solidBounds, Vector2 velocity)
+        {
+            Rectangle playerBounds = new Rectangle(
+                (int)position.X,
+                (int)position.Y,
+                GameConfig.PlayerWidth,
+                GameConfig.PlayerHeight
+            );
+
+            foreach (var platform in solidBounds)
+            {
+                if (playerBounds.Intersects(platform))
+                {
+                    if (velocity.Y > 0)
+                    {
+                        position.Y = platform.Top - GameConfig.PlayerHeight;
+                        return VerticalCollisionResult.Landing;
+                    }
+                    else if (velocity.Y < 0)
+                    {
+                        position.Y = platform.Bottom;
+                        return VerticalCollisionResult.HitCeiling;
+                    }
+                }
+            }
+
+            return VerticalCollisionResult.None;
+        }
+
+        private bool IsGroundedAgainstBounds(Vector2 position, List<Rectangle> solidBounds)
+        {
+            Rectangle checkRect = new Rectangle(
+                (int)position.X,
+                (int)position.Y + GameConfig.PlayerHeight + 1,
+                GameConfig.PlayerWidth,
+                1
+            );
+
+            foreach (var platform in solidBounds)
+            {
+                if (checkRect.Intersects(platform))
+                    return true;
+            }
+
+            return false;
         }
 
         protected override void Draw(GameTime gameTime)
@@ -235,6 +373,7 @@ namespace SKILL_ISSUE
             _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
 
             DrawLevel();
+            DrawTraps();
             DrawPlayer();
             DrawDeathCounter();
 
@@ -277,6 +416,14 @@ namespace SKILL_ISSUE
 
             // Exit marker (crimson) - on right floor
             _spriteBatch.Draw(_placeholderPixel, new Rectangle(860, 380, 40, 60), new Color(220, 50, 80));
+        }
+
+        private void DrawTraps()
+        {
+            foreach (var trap in _traps)
+            {
+                trap.Draw(_spriteBatch, _placeholderPixel);
+            }
         }
 
         private void DrawPlayer()
