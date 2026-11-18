@@ -136,6 +136,41 @@ namespace SKILL_ISSUE
                 width: 40,
                 height: 40
             ));
+
+            // === NEW TRAPS (Milestone 6) ===
+
+            // 5. Moving Platform - traverses the gap
+            _traps.Add(new MovingPlatform(
+                startPoint: new Vector2(300, 420),
+                endPoint: new Vector2(450, 420),
+                width: 80,
+                height: 15
+            ));
+
+            // 6. Rotating Saw - patrols left platform area
+            _traps.Add(new RotatingSaw(
+                startPoint: new Vector2(160, 350),
+                endPoint: new Vector2(240, 350),
+                radius: 12
+            ));
+
+            // 7. Bait Object - tempting collectible on center platform
+            _traps.Add(new BaitObject(
+                position: new Vector2(380, 270),
+                size: 12
+            ));
+
+            // 8. Teleport Trap - near right low platform (teleports to left floor)
+            _traps.Add(new TeleportTrap(
+                triggerZone: new Rectangle(650, 355, 40, 40),
+                destination: new Vector2(100, 430)
+            ));
+
+            // 9. Fake Exit - looks like real exit but teleports back
+            _traps.Add(new FakeExit(
+                exitRect: new Rectangle(820, 380, 30, 60),
+                teleportDestination: new Vector2(100, 430)
+            ));
         }
 
         protected override void LoadContent()
@@ -218,6 +253,9 @@ namespace SKILL_ISSUE
                 }
             }
 
+            // Handle special trap interactions
+            HandleSpecialTraps();
+
             // Consume death request and increment counter
             if (_player.ConsumeDeathRequest())
             {
@@ -226,6 +264,32 @@ namespace SKILL_ISSUE
             }
 
             base.Update(gameTime);
+        }
+
+        private void HandleSpecialTraps()
+        {
+            foreach (var trap in _traps)
+            {
+                // Teleport trap
+                if (trap is TeleportTrap teleport && teleport.ConsumeTeleport())
+                {
+                    _player.Position = teleport.Destination;
+                    _player.StopVertical();
+                }
+
+                // Fake exit trap
+                if (trap is FakeExit fakeExit && fakeExit.ConsumeTrigger())
+                {
+                    _player.Position = fakeExit.TeleportDestination;
+                    _player.StopVertical();
+                }
+
+                // Bait object (triggers falling block or spikes)
+                if (trap is BaitObject bait && bait.ConsumeCollection())
+                {
+                    // Just collected - trap triggers are already set up in level design
+                }
+            }
         }
 
         private void ResetAllTraps()
@@ -290,6 +354,34 @@ namespace SKILL_ISSUE
                 _player.Position,
                 allSolidBounds
             );
+
+            // Apply moving platform carry (if standing on one)
+            if (_player.IsGrounded)
+            {
+                ApplyMovingPlatformCarry(deltaTime);
+            }
+        }
+
+        private void ApplyMovingPlatformCarry(float deltaTime)
+        {
+            Rectangle playerFeet = new Rectangle(
+                (int)_player.Position.X,
+                (int)_player.Position.Y + GameConfig.PlayerHeight + 1,
+                GameConfig.PlayerWidth,
+                1
+            );
+
+            foreach (var trap in _traps)
+            {
+                if (trap is MovingPlatform movingPlatform && movingPlatform.IsSolid())
+                {
+                    if (playerFeet.Intersects(movingPlatform.SolidBounds))
+                    {
+                        _player.Position += movingPlatform.Velocity * deltaTime;
+                        break;
+                    }
+                }
+            }
         }
 
         private bool ResolveHorizontalCollision(ref Vector2 position, List<Rectangle> solidBounds, Vector2 velocity)
