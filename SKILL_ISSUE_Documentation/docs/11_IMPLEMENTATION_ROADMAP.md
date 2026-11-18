@@ -185,10 +185,26 @@ Tasks:
 - Add warning feedback.
 
 Acceptance:
-- [ ] Each trap is reproducible.
-- [ ] No trap causes an unintended soft lock.
-- [ ] Moving platform carry is stable.
-- [ ] Fake exit does not complete the level.
+- [x] Each trap is reproducible.
+- [x] No trap causes an unintended soft lock.
+- [x] Moving platform carry is stable.
+- [x] Fake exit does not complete the level.
+
+**Completed:** 18 Nov 2026  
+**Files created:**
+- `Source/Traps/MovingPlatform.cs` - Platform with player carry behavior
+- `Source/Traps/FakeExit.cs` - Deceptive exit with teleport
+- `Source/Traps/BaitObject.cs` - Collectible trap trigger
+- `Source/Traps/TeleportTrap.cs` - Position teleporter
+- `Source/Traps/RotatingSaw.cs` - Rotating hazard with patrol
+
+**Features implemented:**
+- Moving platform with velocity-based player carry (no jitter)
+- Fake exit visually identical to real exit, teleports player back
+- Bait object with pulsing animation
+- Teleport trap with cooldown system
+- Rotating saw with animated blades and patrol movement
+- Special trap handling in Game1.cs (teleport, fake exit, bait collection)
 
 ## Milestone 7 — Level data and first world
 
@@ -198,10 +214,27 @@ Tasks:
 - Add restart and checkpoint handling.
 
 Acceptance:
-- [ ] Three levels load from data.
-- [ ] Spawn and exit are valid.
-- [ ] All three levels are completable.
-- [ ] Unlock progression works.
+- [x] Three levels load from data.
+- [x] Spawn and exit are valid.
+- [x] All three levels are completable.
+- [x] Unlock progression works.
+
+**Completed:** 18 Nov 2026  
+**Files created:**
+- `Source/Level/LevelData.cs` - Level structure with platforms, hazards, traps
+- `Source/Level/LevelLoader.cs` - JSON parsing and trap instantiation
+- `Source/Level/WorldProgressionManager.cs` - Level unlock and progression tracking
+- `Content/Levels/W1_L1.json` - Tutorial level (simple spikes, bait)
+- `Content/Levels/W1_L2.json` - Trap introduction (4 basic traps)
+- `Content/Levels/W1_L3.json` - Advanced traps (moving platform, saw, teleport, fake exit)
+
+**Features implemented:**
+- JSON-based level format
+- Automatic trap instantiation from data
+- Exit collision triggers level completion
+- Progression system unlocks next level
+- Death counter resets on level completion
+- W1_L1 always unlocked at start
 
 ## Milestone 8 — Full campaign
 
@@ -229,10 +262,30 @@ Tasks:
 - Visual transitions and feedback.
 
 Acceptance:
-- [ ] All screens are keyboard navigable.
-- [ ] UI matches visual guidelines.
-- [ ] Pause freezes gameplay.
-- [ ] Progression screens behave correctly.
+- [x] All screens are keyboard navigable.
+- [x] UI matches visual guidelines.
+- [x] Pause freezes gameplay.
+- [x] Progression screens behave correctly.
+
+**Completed:** 18 Nov 2026  
+**Files created:**
+- `Source/UI/GameState.cs` - Game state enum
+- `Source/UI/UIHelper.cs` - Shared text/button rendering with 3x5 pixel font
+- `Source/UI/MainMenu.cs` - Title screen with Play/Exit
+- `Source/UI/LevelSelectMenu.cs` - World/level selection with unlock display
+- `Source/UI/PauseMenu.cs` - Pause overlay with Resume/Restart/Main Menu
+- `Source/UI/LevelCompleteScreen.cs` - Victory screen with death count feedback
+
+**Features implemented:**
+- State machine architecture (MainMenu, LevelSelect, Playing, Paused, LevelComplete, GameComplete)
+- Main menu with title and navigation
+- Level select with 5 worlds × 3 levels grid, locked/unlocked display
+- Pause menu with dark overlay
+- Level complete screen with 2.5s display before auto-advance
+- Death count feedback messages on completion
+- Game complete screen after all levels
+- W/S/Arrows for navigation, Space/Enter to select, Escape to back/pause
+- All UI using custom pixel font (consistent with game style)
 
 ## Milestone 10 — Art and audio integration
 

@@ -99,5 +99,36 @@ namespace SKILL_ISSUE.Input
         {
             return WasPressed(Keys.Escape);
         }
+
+        // Menu navigation inputs
+        public bool MenuUpPressed()
+        {
+            return WasPressed(Keys.W) || WasPressed(Keys.Up);
+        }
+
+        public bool MenuDownPressed()
+        {
+            return WasPressed(Keys.S) || WasPressed(Keys.Down);
+        }
+
+        public bool MenuLeftPressed()
+        {
+            return WasPressed(Keys.A) || WasPressed(Keys.Left);
+        }
+
+        public bool MenuRightPressed()
+        {
+            return WasPressed(Keys.D) || WasPressed(Keys.Right);
+        }
+
+        public bool MenuSelectPressed()
+        {
+            return WasPressed(Keys.Space) || WasPressed(Keys.Enter);
+        }
+
+        public bool MenuBackPressed()
+        {
+            return WasPressed(Keys.Escape);
+        }
     }
 }
