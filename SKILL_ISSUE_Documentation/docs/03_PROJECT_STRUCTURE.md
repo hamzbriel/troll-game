@@ -1,47 +1,54 @@
 # 03 — Project Structure
 
-## 1. Target repository layout
+## 1. Actual repository layout
 
-The exact generated MonoGame template files may differ slightly. Preserve required template files and adapt this structure without breaking the project.
+The project uses a **separated structure** with documentation and code in different directories:
 
 ```text
-SKILL_ISSUE/
-├── .claude/
-│   └── rules/
-├── Assets/
-│   ├── Sprites/
-│   │   ├── Player/
+troll-game/                          # Repository root
+├── SKILL_ISSUE/                     # MonoGame project (code)
+│   ├── Content/
+│   │   └── Content.mgcb             # MonoGame Content Pipeline
+│   ├── Source/                      # Code organization (to be created)
+│   │   ├── Core/
+│   │   ├── Input/
+│   │   ├── Graphics/
+│   │   ├── Entities/
+│   │   ├── Physics/
 │   │   ├── Traps/
-│   │   ├── Environment/
-│   │   └── UI/
-│   ├── Backgrounds/
-│   ├── Audio/
-│   │   ├── Music/
-│   │   └── SFX/
-│   └── Fonts/
-├── Content/
-│   └── Content.mgcb
-├── docs/
-├── Source/
-│   ├── Core/
-│   ├── Input/
-│   ├── Graphics/
-│   ├── Entities/
-│   ├── Physics/
-│   ├── Traps/
-│   ├── Levels/
-│   ├── States/
-│   ├── UI/
-│   └── Audio/
-├── Tests/
-├── Game1.cs
-├── Program.cs
-├── SKILL_ISSUE.csproj
-├── CLAUDE.md
-└── README.md
+│   │   ├── Levels/
+│   │   ├── States/
+│   │   ├── UI/
+│   │   └── Audio/
+│   ├── Assets/                      # Source assets (to be created)
+│   │   ├── Sprites/
+│   │   │   ├── Player/
+│   │   │   ├── Traps/
+│   │   │   ├── Environment/
+│   │   │   └── UI/
+│   │   ├── Backgrounds/
+│   │   ├── Audio/
+│   │   │   ├── Music/
+│   │   │   └── SFX/
+│   │   └── Fonts/
+│   ├── Tests/                       # Unit tests (to be created)
+│   ├── Game1.cs                     # Main game class
+│   ├── Program.cs                   # Entry point
+│   ├── SKILL_ISSUE.csproj           # Project file
+│   ├── .gitignore                   # Build artifacts ignore
+│   └── Icon.ico/Icon.bmp            # Window icons
+├── SKILL_ISSUE_Documentation/       # Complete specification
+│   ├── .claude/
+│   │   └── rules/                   # Claude Code rules
+│   ├── docs/                        # 13 design documents
+│   ├── CLAUDE.md                    # Claude Code instructions
+│   └── README.md                    # Documentation overview
+├── CLAUDE.md                        # Copy at root for easier access
+├── README.md                        # Repository overview
+└── .gitignore                       # Git ignore for repository
 ```
 
-Do not move or rename the generated entry point until the project has been inspected and the namespace/build implications are understood.
+**Note:** `Source/` and `Assets/` folders will be created incrementally as features are implemented. The MonoGame template provides the base structure; preserve `Game1.cs`, `Program.cs`, and `Content/` as generated.
 
 ## 2. Folder responsibilities
 

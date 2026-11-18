@@ -16,10 +16,13 @@ Tasks:
 - Add `.gitignore` appropriate for Visual Studio/.NET if using Git.
 
 Acceptance:
-- [ ] Project builds.
-- [ ] Empty MonoGame window launches.
-- [ ] Documentation is present.
-- [ ] No unnecessary package upgrades.
+- [x] Project builds.
+- [x] Empty MonoGame window launches.
+- [x] Documentation is present.
+- [x] No unnecessary package upgrades.
+
+**Completed:** 18 Nov 2026  
+**Environment:** .NET 10.0.403, MonoGame 3.8.6.1, net9.0, Windows 10
 
 ## Milestone 1 — Window and rendering foundation
 
@@ -31,10 +34,23 @@ Tasks:
 - Draw a temporary background, floor, and placeholder player.
 
 Acceptance:
-- [ ] Window shows correct title.
-- [ ] Logical scene is 960 × 540.
-- [ ] Resizing does not distort aspect ratio.
-- [ ] Placeholder scene renders cleanly.
+- [x] Window shows correct title.
+- [x] Logical scene is 960 × 540.
+- [x] Resizing does not distort aspect ratio.
+- [x] Placeholder scene renders cleanly.
+
+**Completed:** 18 Nov 2026  
+**Files created:**
+- `Source/Core/GameConfig.cs` - Game constants and tuning values
+- `Source/Graphics/ViewportScaler.cs` - Aspect ratio preservation
+- Modified `Game1.cs` - Render target, viewport scaling, placeholder scene
+
+**Graphics concepts demonstrated:**
+- Logical vs physical resolution separation
+- Render target rendering
+- Viewport scaling with letterboxing/pillarboxing
+- Nearest-neighbor sampling (SamplerState.PointClamp) for pixel art
+- Primitive rectangle rendering
 
 ## Milestone 2 — Input and player movement
 
